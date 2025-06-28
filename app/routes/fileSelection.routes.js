@@ -22,7 +22,8 @@ const openApi = async (res, content) => {
     });
   }
 
-  const promptMessage = "Give me formatted text from the content.";
+  const promptMessage =
+    "Give me formatted text from the content. convert text to upper case";
 
   try {
     const response = await axios({
@@ -66,7 +67,7 @@ const openApi = async (res, content) => {
 
 // Upload endpoint
 router.post(
-  "/",
+  "/plainText",
   auth.verifyAuthToken,
   upload.array("files", 10),
   (req, res) => {

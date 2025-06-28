@@ -10,7 +10,7 @@ var app = express();
 var corsOptions = {
   origin: [
     // CORS whitelist for local
-    "http://localhost:9000",
+    "http://localhost:8080",
   ],
   preflightContinue: false,
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
@@ -22,6 +22,7 @@ var appRouter = require("./app/routes/app.routes");
 var authRouter = require("./app/routes/auth.routes");
 var usersRouter = require("./app/routes/users.routes");
 var aiRouter = require("./app/routes/ai.routes");
+var fileSelectionRouter = require("./app/routes/fileSelection.routes");
 
 app.use(logger("dev"));
 app.use(express.json());
@@ -33,5 +34,6 @@ app.use("/app", appRouter);
 app.use("/login", authRouter);
 app.use("/users", usersRouter);
 app.use("/ai", aiRouter);
+app.use("/fileSelection", fileSelectionRouter);
 
 module.exports = app;

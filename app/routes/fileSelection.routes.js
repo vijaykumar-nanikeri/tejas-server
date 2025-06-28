@@ -4,6 +4,7 @@ const HttpStatus = require("http-status-codes");
 const multer = require("multer");
 const axios = require("axios");
 const mammoth = require("mammoth");
+const pdfParse = require("pdf-parse");
 
 const HttpMethod = require("../config/http.config");
 const auth = require("../controllers/auth.controller");
@@ -120,6 +121,40 @@ router.post(
       return res.status(HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR).send({
         statusMessage: HttpStatus.ReasonPhrases.INTERNAL_SERVER_ERROR,
         message: "Failed to process DOCX file",
+      });
+    }
+  }
+);
+
+router.post(
+  "/pdf",
+  auth.verifyAuthToken,
+  upload.array("files", 10),
+  async (req, res) => {
+    const { files } = req;
+
+    if (!files || files.length === 0) {
+      return res.status(HttpStatus.StatusCodes.BAD_REQUEST).send({
+        statusMessage: HttpStatus.ReasonPhrases.BAD_REQUEST,
+        message: "No files uploaded",
+      });
+    }
+
+    try {
+      let combinedContent = "";
+
+      for (const file of files) {
+        const data = await pdfParse(file.buffer);
+        combinedContent += data.text + "\n";
+      }
+
+      openApi(res, combinedContent);
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+
+      return res.status(HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR).send({
+        statusMessage: HttpStatus.ReasonPhrases.INTERNAL_SERVER_ERROR,
+        message: "Failed to process PDF file",
       });
     }
   }

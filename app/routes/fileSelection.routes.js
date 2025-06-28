@@ -88,7 +88,11 @@ router.post(
       combinedContent += file.buffer.toString("utf-8") + "\n";
     });
 
-    openApi(res, combinedContent);
+    return res.status(HttpStatus.StatusCodes.OK).send({
+      statusCode: HttpStatus.StatusCodes.OK,
+      statusMessage: HttpStatus.ReasonPhrases.OK,
+      message: combinedContent,
+    });
   }
 );
 
@@ -114,7 +118,11 @@ router.post(
         combinedContent += result.value + "\n";
       }
 
-      openApi(res, combinedContent);
+      return res.status(HttpStatus.StatusCodes.OK).send({
+        statusCode: HttpStatus.StatusCodes.OK,
+        statusMessage: HttpStatus.ReasonPhrases.OK,
+        message: combinedContent,
+      });
     } catch (error) {
       console.error("Error processing DOCX:", error);
 
@@ -148,7 +156,11 @@ router.post(
         combinedContent += data.text + "\n";
       }
 
-      openApi(res, combinedContent);
+      return res.status(HttpStatus.StatusCodes.OK).send({
+        statusCode: HttpStatus.StatusCodes.OK,
+        statusMessage: HttpStatus.ReasonPhrases.OK,
+        message: combinedContent,
+      });
     } catch (error) {
       console.error("Error processing PDF:", error);
 

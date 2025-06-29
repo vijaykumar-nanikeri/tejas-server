@@ -5,36 +5,12 @@ const multer = require("multer");
 const axios = require("axios");
 const mammoth = require("mammoth");
 const pdfParse = require("pdf-parse");
-const path = require("path");
-const fs = require("fs");
 
 const HttpMethod = require("../config/http.config");
 const auth = require("../controllers/auth.controller");
 
 // Multer setup – stores files in memory
 const upload = multer({ storage: multer.memoryStorage() });
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "../../uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Multer setup for file storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
-
-const fileUpload = multer({ storage: storage });
 
 // Environment configs
 const { OPENAI_API_URL, OPENAI_MODEL, OPENAI_API_KEY } = process.env;
@@ -201,7 +177,7 @@ router.post(
 router.post(
   "/uploadEvidence",
   auth.verifyAuthToken,
-  fileUpload.any(),
+  upload.any(),
   async (req, res) => {
     try {
       const { files } = req;
@@ -217,37 +193,72 @@ router.post(
         });
       }
 
-      // Process uploaded files
-      const uploadedFiles = files.map((file) => ({
-        originalName: file.originalname,
-        filename: file.filename,
-        path: file.path,
-        size: file.size,
-        mimetype: file.mimetype,
-      }));
+      // Process uploaded files and extract content
+      const fileContents = [];
 
-      // Log the upload details
-      console.log("Evidence upload details:", {
-        totalFiles: files.length,
-        claimsMetadata: claimsMetadata,
-        uploadedFiles: uploadedFiles.map((f) => f.originalName),
+      for (const file of files) {
+        let content = "";
+
+        try {
+          // Extract content based on file type
+          if (file.mimetype === "application/pdf") {
+            const data = await pdfParse(file.buffer);
+            content = data.text;
+          } else if (
+            file.mimetype ===
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+            file.mimetype === "application/msword"
+          ) {
+            const result = await mammoth.extractRawText({
+              buffer: file.buffer,
+            });
+            content = result.value;
+          } else if (
+            file.mimetype.startsWith("text/") ||
+            file.mimetype === "application/octet-stream"
+          ) {
+            content = file.buffer.toString("utf-8");
+          } else if (file.mimetype.startsWith("image/")) {
+            content = `[Image file: ${file.originalname}] - Size: ${file.size} bytes`;
+          } else {
+            content = `[Unsupported file type: ${file.mimetype}] - Size: ${file.size} bytes`;
+          }
+
+          fileContents.push({
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            content: content,
+          });
+        } catch (parseError) {
+          console.error(`Error parsing file ${file.originalname}:`, parseError);
+          fileContents.push({
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            content: `[Error parsing file: ${parseError.message}]`,
+          });
+        }
+      }
+
+      let combinedContent = "";
+
+      fileContents.forEach((file, index) => {
+        combinedContent += file.content + "\n";
       });
 
       return res.status(HttpStatus.StatusCodes.OK).send({
         statusCode: HttpStatus.StatusCodes.OK,
         statusMessage: HttpStatus.ReasonPhrases.OK,
-        message: `Successfully uploaded ${files.length} evidence files`,
-        uploadedFiles: uploadedFiles.map((f) => f.filename),
-        totalFiles: files.length,
-        claimsProcessed: claimsMetadata.length,
+        message: combinedContent,
       });
     } catch (error) {
-      console.error("Error uploading evidence files:", error);
+      console.error("Error processing evidence files:", error);
 
       return res.status(HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR).send({
         statusCode: HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR,
         statusMessage: HttpStatus.ReasonPhrases.INTERNAL_SERVER_ERROR,
-        message: "Failed to upload evidence files",
+        message: "Failed to process evidence files",
         error: error.message,
       });
     }
@@ -258,7 +269,7 @@ router.post(
 router.post(
   "/uploadSingleClaim",
   auth.verifyAuthToken,
-  fileUpload.any(),
+  upload.any(),
   async (req, res) => {
     try {
       const { files } = req;
@@ -272,33 +283,91 @@ router.post(
         });
       }
 
-      // Process uploaded files
-      const uploadedFiles = files.map((file) => ({
-        originalName: file.originalname,
-        filename: file.filename,
-        path: file.path,
-        size: file.size,
-        mimetype: file.mimetype,
-      }));
+      // Process uploaded files and extract content
+      const fileContents = [];
 
-      console.log(`Single claim upload - Claim ${claimIndex}:`, {
-        files: uploadedFiles.map((f) => f.originalName),
+      for (const file of files) {
+        let content = "";
+
+        try {
+          // Extract content based on file type
+          if (file.mimetype === "application/pdf") {
+            const data = await pdfParse(file.buffer);
+            content = data.text;
+          } else if (
+            file.mimetype ===
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+            file.mimetype === "application/msword"
+          ) {
+            const result = await mammoth.extractRawText({
+              buffer: file.buffer,
+            });
+            content = result.value;
+          } else if (
+            file.mimetype.startsWith("text/") ||
+            file.mimetype === "application/octet-stream"
+          ) {
+            content = file.buffer.toString("utf-8");
+          } else if (file.mimetype.startsWith("image/")) {
+            content = `[Image file: ${file.originalname}] - Size: ${file.size} bytes`;
+          } else {
+            content = `[Unsupported file type: ${file.mimetype}] - Size: ${file.size} bytes`;
+          }
+
+          fileContents.push({
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            content: content,
+          });
+        } catch (parseError) {
+          console.error(`Error parsing file ${file.originalname}:`, parseError);
+          fileContents.push({
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            content: `[Error parsing file: ${parseError.message}]`,
+          });
+        }
+      }
+
+      // Log all file contents for single claim
+      console.log(`=== SINGLE CLAIM UPLOAD - CLAIM ${claimIndex} ===`);
+      console.log("Total files uploaded:", files.length);
+      console.log("\n--- FILE CONTENTS ---");
+
+      fileContents.forEach((file, index) => {
+        console.log(`\n[${index + 1}] File: ${file.originalName}`);
+        console.log(`Type: ${file.mimetype}`);
+        console.log(`Size: ${file.size} bytes`);
+        console.log("Content:");
+        console.log("---START OF CONTENT---");
+        console.log(file.content);
+        console.log("---END OF CONTENT---");
+        console.log(""); // Empty line for separation
       });
+
+      console.log(`=== END OF CLAIM ${claimIndex} UPLOAD ===\n`);
 
       return res.status(HttpStatus.StatusCodes.OK).send({
         statusCode: HttpStatus.StatusCodes.OK,
         statusMessage: HttpStatus.ReasonPhrases.OK,
-        message: `Successfully uploaded ${files.length} files for claim ${claimIndex}`,
-        uploadedFiles: uploadedFiles.map((f) => f.filename),
+        message: `Successfully processed ${files.length} files for claim ${claimIndex}`,
         claimIndex: claimIndex,
+        totalFiles: files.length,
+        fileDetails: fileContents.map((f) => ({
+          name: f.originalName,
+          type: f.mimetype,
+          size: f.size,
+        })),
       });
     } catch (error) {
-      console.error("Error uploading single claim files:", error);
+      console.error("Error processing single claim files:", error);
 
       return res.status(HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR).send({
         statusCode: HttpStatus.StatusCodes.INTERNAL_SERVER_ERROR,
         statusMessage: HttpStatus.ReasonPhrases.INTERNAL_SERVER_ERROR,
-        message: "Failed to upload claim files",
+        message: "Failed to process claim files",
         error: error.message,
       });
     }
